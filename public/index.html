@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agendamento Manicure</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fff5f7; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        form { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 320px; border: 1px solid #ffdae9; }
+        h2 { color: #d63384; text-align: center; margin-bottom: 20px; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ffc1e3; border-radius: 10px; box-sizing: border-box; outline: none; }
+        input:focus { border-color: #d63384; }
+        button { width: 100%; padding: 14px; background: #d63384; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 10px; transition: 0.3s; }
+        button:hover { background: #b82a6e; transform: scale(1.02); }
+    </style>
+</head>
+<body>
+
+    <form id="formAgendamento">
+        <h2>Unhas de Rainha</h2>
+        <input type="text" id="nome" placeholder="Seu nome" required>
+        <input type="text" id="tel" placeholder="Seu telefone (WhatsApp)" required>
+        <select id="servicos"></select>
+        <input type="datetime-local" id="data" required>
+        <button type="submit">Agendar Agora</button>
+    </form>
+
+    <script>
+        // Busca os serviços do seu servidor Node
+        async function init() {
+            try {
+                const res = await fetch('http://localhost:3000/services');
+                const dados = await res.json();
+                const select = document.getElementById('servicos');
+                dados.forEach(s => {
+                    select.innerHTML += `<option value="${s.id}">${s.name} - R$ ${s.price}</option>`;
+                });
+            } catch (err) {
+                console.error("Erro ao carregar serviços:", err);
+            }
+        }
+
+        document.getElementById('formAgendamento').onsubmit = async (e) => {
+            e.preventDefault();
+
+            const nome = document.getElementById('nome').value;
+            const tel = document.getElementById('tel').value;
+            const servicoSelect = document.getElementById('servicos');
+            const servicoNome = servicoSelect.options[servicoSelect.selectedIndex].text;
+            const dataBruta = document.getElementById('data').value;
+
+            const dataObj = new Date(dataBruta);
+            const dataFormatada = dataObj.toLocaleDateString('pt-BR') + ' às ' + 
+                                 dataObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+
+            const payload = {
+                client_name: nome,
+                client_phone: tel,
+                service_id: servicoSelect.value,
+                appointment_date: dataBruta
+            };
+
+            try {
+                // 1. Salva no banco local
+                const response = await fetch('http://localhost:3000/appointments', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    // 2. Abre o WhatsApp do Marcelo (5511913326195)
+                    const numeroZap = "5511913326195"; 
+                    const mensagem = `Olá! Me chamo *${nome}* e acabei de agendar um horário pelo site:%0A%0A` +
+                                     `*Serviço:* ${servicoNome}%0A` +
+                                     `*Data:* ${dataFormatada}%0A%0A` +
+                                     `_Pode confirmar para mim?_`;
+
+                    window.open(`https://wa.me/${numeroZap}?text=${mensagem}`, '_blank');
+                    alert('Agendamento realizado com sucesso!');
+                } else {
+                    alert('Erro ao salvar agendamento.');
+                }
+            } catch (error) {
+                console.error("Erro:", error);
+                alert('Erro de conexão com o servidor.');
+            }
+        };
+
+        init();
+    </script>
+</body>
+</html>
